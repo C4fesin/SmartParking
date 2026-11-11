@@ -1,0 +1,662 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Smart Parking | Estacionamento Inteligente</title>
+
+    <style>
+
+        
+:root {
+    --background: #172A32;
+    --surface: #263C45;
+    --border: #3B535B;
+
+    --primary: #36A69A;
+    --primary-hover: #27877E;
+
+    --free-bg: #174F49;
+    --free-text: #8DE0C7;
+
+    --occupied-bg: #633B37;
+    --occupied-text: #FFB1A3;
+
+    --warning: #E5B765;
+
+    --text: #EAF0ED;
+    --muted: #A9BDBD;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: var(--background);
+    color: var(--text);
+    padding: 30px;
+}
+
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 30px;
+}
+
+h1 {
+    font-size: 27px;
+}
+
+.subtitle {
+    color: var(--muted);
+    margin-top: 7px;
+}
+
+.connection {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 12px 16px;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+.dot {
+    display: inline-block;
+    width: 9px;
+    height: 9px;
+    background: #36A69A;
+    border-radius: 50%;
+    margin-right: 7px;
+}
+
+.summary {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 30px;
+}
+
+.card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+}
+
+.card h3 {
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: normal;
+    margin-bottom: 12px;
+}
+
+.number {
+    font-size: 32px;
+    font-weight: bold;
+}
+
+.section-title {
+    font-size: 19px;
+    margin-bottom: 18px;
+}
+
+.parking-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 18px;
+    margin-bottom: 30px;
+}
+
+.slot {
+    text-align: center;
+    padding: 25px 15px;
+    border-radius: 14px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    transition: border-color 0.2s, background 0.2s;
+}
+
+.slot-icon {
+    font-size: 38px;
+    margin-bottom: 12px;
+}
+
+.slot h3 {
+    margin-bottom: 12px;
+}
+
+.status {
+    display: inline-block;
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.free {
+    background: var(--free-bg);
+    color: var(--free-text);
+}
+
+.occupied {
+    background: var(--occupied-bg);
+    color: var(--occupied-text);
+}
+
+.gate {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 30px;
+}
+
+.gate-state {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.events {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 15px 20px;
+}
+
+.event {
+    padding: 13px 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    color: var(--text);
+}
+
+.event:last-child {
+    border-bottom: none;
+}
+
+.event-time {
+    color: var(--muted);
+    margin-right: 12px;
+}
+
+.error {
+    color: var(--occupied-text);
+    font-size: 13px;
+}
+
+.control-btn,
+.reset-btn {
+    padding: 10px 15px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.control-btn {
+    background: var(--primary);
+    color: #102B2A;
+}
+
+.control-btn:hover {
+    background: var(--primary-hover);
+    transform: translateY(-1px);
+}
+
+.reset-btn {
+    background: #475B62;
+    color: var(--text);
+}
+
+.reset-btn:hover {
+    background: #586F76;
+}
+
+.control-btn:disabled,
+.reset-btn:disabled {
+    opacity: 0.5;
+    cursor: wait;
+    transform: none;
+}
+
+footer {
+    text-align: center;
+    color: var(--muted);
+    margin-top: 30px;
+    font-size: 12px;
+}
+
+@media (max-width: 650px) {
+    body {
+        padding: 18px;
+    }
+
+    .summary,
+    .parking-grid {
+        grid-template-columns: 1fr;
+    }
+
+    h1 {
+        font-size: 22px;
+    }
+}
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <header>
+        <div>
+            <h1>Estacionamento Inteligente </h1>
+            <p class="subtitle">
+                Sistema de monitoramento de estacionamento
+            </p>
+        </div>
+
+        <div class="connection" id="connection">
+            <span class="dot"></span>
+            Conectando...
+        </div>
+    </header>
+
+    <section class="summary">
+
+        <div class="card">
+            <h3>Total de vagas</h3>
+            <div class="number">3</div>
+        </div>
+
+        <div class="card">
+            <h3>Vagas livres</h3>
+            <div class="number" id="freeCount">3</div>
+        </div>
+
+        <div class="card">
+            <h3>Vagas ocupadas</h3>
+            <div class="number" id="occupiedCount">0</div>
+        </div>
+
+    </section>
+<!-- PAINEL DO SIMULADOR -->
+
+<section class="card" style="margin-bottom: 30px;">
+
+    <h2 class="section-title">Painel de simulação</h2>
+
+    <p style="color: #94a3b8; margin-bottom: 20px;">
+        Utilize os controles abaixo para simular o funcionamento
+        do estacionamento sem conectar o Arduino.
+    </p>
+
+    <h3 style="margin-bottom: 12px;">Controle das vagas</h3>
+
+    <div class="parking-grid">
+
+        <div>
+            <p style="margin-bottom: 10px;">Vaga 01</p>
+            <button class="control-btn" data-action="ocupar" data-vaga="1">
+                Ocupar
+            </button>
+            <button class="control-btn" data-action="liberar" data-vaga="1">
+                Liberar
+            </button>
+        </div>
+
+        <div>
+            <p style="margin-bottom: 10px;">Vaga 02</p>
+            <button class="control-btn" data-action="ocupar" data-vaga="2">
+                Ocupar
+            </button>
+            <button class="control-btn" data-action="liberar" data-vaga="2">
+                Liberar
+            </button>
+        </div>
+
+        <div>
+            <p style="margin-bottom: 10px;">Vaga 03</p>
+            <button class="control-btn" data-action="ocupar" data-vaga="3">
+                Ocupar
+            </button>
+            <button class="control-btn" data-action="liberar" data-vaga="3">
+                Liberar
+            </button>
+        </div>
+
+    </div>
+
+    <h3 style="margin-bottom: 12px;">Controle da cancela</h3>
+
+    <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;">
+
+        <button class="control-btn" data-action="abrir">
+            Abrir cancela
+        </button>
+
+        <button class="control-btn" data-action="fechar">
+            Fechar cancela
+        </button>
+
+        <button class="control-btn" data-action="veiculo">
+            Simular chegada de veículo
+        </button>
+
+    </div>
+
+    <button class="reset-btn" data-action="resetar">
+        Restaurar estacionamento
+    </button>
+
+    <p id="simulationMessage"
+       style="margin-top: 15px; color: #94a3b8; font-size: 13px;">
+        Simulador pronto para uso.
+    </p>
+
+</section>
+
+    <h2 class="section-title">Monitoramento das vagas</h2>
+
+    <section class="parking-grid">
+
+        <div class="slot" id="slot1">
+            <div class="slot-icon">🅿️</div>
+            <h3>Vaga 01</h3>
+            <span class="status free" id="status1">LIVRE</span>
+        </div>
+
+        <div class="slot" id="slot2">
+            <div class="slot-icon">🅿️</div>
+            <h3>Vaga 02</h3>
+            <span class="status free" id="status2">LIVRE</span>
+        </div>
+
+        <div class="slot" id="slot3">
+            <div class="slot-icon">🅿️</div>
+            <h3>Vaga 03</h3>
+            <span class="status free" id="status3">LIVRE</span>
+        </div>
+
+    </section>
+
+    <h2 class="section-title">Estado da cancela</h2>
+
+    <section class="card gate">
+
+        <div>
+            <h3>Controle de acesso</h3>
+            <div class="gate-state" id="gateState">
+                FECHADA
+            </div>
+        </div>
+
+        <div class="status free" id="gateBadge">
+            SISTEMA OPERACIONAL
+        </div>
+
+    </section>
+
+    <h2 class="section-title">Histórico de eventos</h2>
+
+    <section class="events" id="eventList">
+        <p>Carregando eventos...</p>
+    </section>
+
+    <footer>
+        Projeto acadêmico de Automação e Integração de Sistemas
+        <br>
+        Arduino • Python • Flask • Dashboard Web
+    </footer>
+
+</div>
+
+<script>
+
+    // ==================================
+    // ATUALIZAR ESTADO DAS VAGAS
+    // ==================================
+
+    async function atualizarStatus() {
+
+        try {
+
+            const resposta = await fetch("/api/status");
+
+            if (!resposta.ok) {
+                throw new Error("Erro na API");
+            }
+
+            const dados = await resposta.json();
+
+            document.getElementById("connection").innerHTML =
+                '<span class="dot"></span> Sistema conectado';
+
+            document.getElementById("freeCount").textContent =
+                dados.vagas_livres;
+
+            document.getElementById("occupiedCount").textContent =
+                dados.vagas_ocupadas;
+
+            // Atualiza cada vaga
+            // Atualiza cada vaga
+            for (let i = 1; i <= 3; i++) {
+
+            const status = dados.vagas[String(i)];
+
+            const elemento =
+            document.getElementById("status" + i);
+
+            if (status === "OCUPADA") {
+
+            elemento.textContent = "OCUPADA";
+            elemento.className = "status occupied";
+
+            } else if (status === "LIVRE") {
+
+            elemento.textContent = "LIVRE";
+            elemento.className = "status free";
+
+            } else {
+
+            elemento.textContent = "DESCONHECIDO";
+            elemento.className = "status";
+            }
+        }
+
+            // Atualiza cancela
+            const gateState =
+                document.getElementById("gateState");
+
+            const gateBadge =
+                document.getElementById("gateBadge");
+
+            if (dados.cancela === "ABERTA") {
+            gateState.textContent = "ABERTA";
+            gateBadge.textContent = "ACESSO LIBERADO";
+            gateBadge.className = "status free";
+            } else {
+            gateState.textContent = "FECHADA";
+            gateBadge.textContent = "CANCELA FECHADA";
+            gateBadge.className = "status occupied";
+            }
+
+        } catch (erro) {
+
+            document.getElementById("connection").innerHTML =
+                '<span class="error">Servidor desconectado</span>';
+        }
+    }
+
+
+    // ==================================
+    // ATUALIZAR HISTORICO
+    // ==================================
+
+    async function atualizarEventos() {
+
+        try {
+
+            const resposta = await fetch("/api/events");
+
+            const dados = await resposta.json();
+
+            const lista =
+                document.getElementById("eventList");
+
+            lista.innerHTML = "";
+
+            if (dados.length === 0) {
+
+                lista.innerHTML =
+                    "<p>Nenhum evento registrado ainda.</p>";
+
+                return;
+            }
+
+            // Mais recentes primeiro
+            dados.reverse().forEach(evento => {
+
+                const item = document.createElement("div");
+
+                item.className = "event";
+
+                const horario =
+                    new Date(evento.horario).toLocaleTimeString("pt-BR");
+
+                const descricao =
+                    evento.tipo + " " +
+                    JSON.stringify(evento.dados);
+
+                const tempo = document.createElement("span");
+                tempo.className = "event-time";
+                tempo.textContent = horario;
+
+                const texto = document.createElement("span");
+                texto.textContent = descricao;
+
+                item.appendChild(tempo);
+                item.appendChild(texto);
+
+                lista.appendChild(item);
+
+            });
+
+        } catch (erro) {
+
+            console.log("Erro ao carregar eventos:", erro);
+        }
+    }
+
+
+    // ==================================
+    // ATUALIZACAO AUTOMATICA
+    // ==================================
+
+    async function atualizarDashboard() {
+
+        await atualizarStatus();
+
+        await atualizarEventos();
+    }
+
+    atualizarDashboard();
+    // ==================================
+// ENVIAR COMANDOS AO PYTHON
+// ==================================
+
+async function enviarComando(acao, vaga = null) {
+
+    const mensagem =
+        document.getElementById("simulationMessage");
+
+    const botoes = document.querySelectorAll(
+        ".control-btn, .reset-btn"
+    );
+
+    botoes.forEach(botao => botao.disabled = true);
+
+    mensagem.textContent = "Enviando comando...";
+
+    try {
+
+        const resposta = await fetch("/api/simulate", {
+
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                acao: acao,
+                vaga: vaga
+            })
+
+        });
+
+        const dados = await resposta.json();
+
+        if (!resposta.ok) {
+            throw new Error(dados.erro || "Erro ao enviar comando");
+        }
+
+        mensagem.textContent =
+            "Comando executado: " + acao;
+
+        await atualizarDashboard();
+
+    } catch (erro) {
+
+        mensagem.textContent =
+            "Falha: " + erro.message;
+
+    } finally {
+
+        botoes.forEach(botao => botao.disabled = false);
+
+    }
+}
+
+
+// ==================================
+// CONFIGURAR BOTOES
+// ==================================
+
+document.querySelectorAll(
+    ".control-btn, .reset-btn"
+).forEach(botao => {
+
+    botao.addEventListener("click", () => {
+
+        const acao = botao.dataset.action;
+        const vaga = botao.dataset.vaga || null;
+
+        enviarComando(acao, vaga);
+
+    });
+
+});
+    setInterval(atualizarDashboard, 1000);
+
+</script>
+
+</body>
+</html>
