@@ -1,15 +1,14 @@
-
 #include <Servo.h>
 #include <string.h>
 
 // =====================================
-// PINOS DO SISTEMA
+// PINOS DO SISTEMA (ARDUINO UNO)
 // =====================================
 
-// Sensor da cancela
+// Sensor reflexivo infravermelho TCRT5000 (cancela)
 const int PINO_SENSOR = 2;
 
-// Botoes das vagas
+// Botoes fisicos das vagas
 const int BOTAO_VAGA_1 = 3;
 const int BOTAO_VAGA_2 = 4;
 const int BOTAO_VAGA_3 = 5;
@@ -19,16 +18,17 @@ const int LED_VAGA_1 = 6;
 const int LED_VAGA_2 = 7;
 const int LED_VAGA_3 = 10;
 
-// Componentes da cancela
+// Componentes da cancela (Buzzer e Micro Servo MG90S)
 const int PINO_BUZZER = 8;
 const int PINO_SERVO = 9;
 
+// LEDs de sinalizacao da cancela
 const int LED_VERMELHO = 11;
 const int LED_AMARELO = 12;
 const int LED_VERDE = 13;
 
 // =====================================
-// CONFIGURACAO DA CANCELA
+// CONFIGURACAO DA CANCELA (SERVO MG90S)
 // =====================================
 
 Servo cancela;
@@ -78,7 +78,7 @@ unsigned long ultimoDebounce[3] = {
 const unsigned long DEBOUNCE = 50;
 
 // =====================================
-// COMUNICACAO SERIAL
+// COMUNICACAO SERIAL (ARDUINO -> PYTHON)
 // =====================================
 
 void enviarEstadoVaga(int numero) {
@@ -132,7 +132,7 @@ void atualizarSemaforo(
 }
 
 // =====================================
-// ABRIR CANCELA
+// ABRIR E FECHAR CANCELA
 // =====================================
 
 void abrirCancela() {
@@ -154,8 +154,27 @@ void abrirCancela() {
   tempoAbertura = millis();
 
   enviarEstadoCancela();
-  
-  
+}
+
+void fecharCancela() {
+
+  if (!cancelaAberta) return;
+
+  atualizarSemaforo(LOW, HIGH, LOW);
+
+  cancela.write(ANGULO_FECHADO);
+
+  delay(300);
+
+  atualizarSemaforo(HIGH, LOW, LOW);
+
+  cancelaAberta = false;
+
+  enviarEstadoCancela();
+
+  Serial.println("EVENT,GATE_CLOSED");
+}
+
 // =====================================
 // COMANDOS RECEBIDOS DO PYTHON
 // =====================================
@@ -183,7 +202,7 @@ void processarComando(char* comando) {
 
   else if (strcmp(comando, "CMD,CLOSE") == 0) {
 
-    // Nunca fechar enquanto houver veículo detectado
+    // Trava de seguranca: nunca fechar enquanto houver veiculo detectado
     if (digitalRead(PINO_SENSOR) == LOW) {
 
       Serial.println("EVENT,CLOSE_BLOCKED");
@@ -210,7 +229,7 @@ void processarComando(char* comando) {
   }
 }
 
-// Leitura serial sem bloquear o loop principal
+// Leitura serial nao bloqueante
 void receberComandosSerial() {
 
   static char buffer[40];
@@ -246,31 +265,6 @@ void receberComandosSerial() {
       }
     }
   }
-}
-
-}
-
-// =====================================
-// FECHAR CANCELA
-// =====================================
-
-void fecharCancela() {
-
-  if (!cancelaAberta) return;
-
-  atualizarSemaforo(LOW, HIGH, LOW);
-
-  cancela.write(ANGULO_FECHADO);
-
-  delay(300);
-
-  atualizarSemaforo(HIGH, LOW, LOW);
-
-  cancelaAberta = false;
-
-  enviarEstadoCancela();
-
-  Serial.println("EVENT,GATE_CLOSED");
 }
 
 // =====================================
@@ -323,7 +317,7 @@ void setup() {
 
   Serial.begin(9600);
 
-  // Sensor
+  // Sensor TCRT5000
   pinMode(PINO_SENSOR, INPUT);
 
   // Botoes
@@ -345,7 +339,7 @@ void setup() {
   pinMode(LED_AMARELO, OUTPUT);
   pinMode(LED_VERDE, OUTPUT);
 
-  // Servo
+  // Micro servo MG90S
   cancela.attach(PINO_SERVO);
   cancela.write(ANGULO_FECHADO);
 
@@ -368,7 +362,6 @@ void setup() {
 // LOOP PRINCIPAL
 // =====================================
 
-
 void loop() {
 
   // Recebe comandos enviados pelo Python
@@ -377,7 +370,7 @@ void loop() {
   // Atualiza os botoes e as vagas
   atualizarVagas();
 
-  // Detecta veiculo
+  // Detecta veiculo (logica original do modulo TCRT5000 preservada)
   bool veiculoDetectado =
     (digitalRead(PINO_SENSOR) == LOW);
 

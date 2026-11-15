@@ -1,11 +1,11 @@
-
+import os
 import serial
 import threading
 import time
 
 from datetime import datetime
 from collections import deque
-from flask import Flask, jsonify, render_template , request
+from flask import Flask, jsonify, render_template, request
 
 # ==========================================
 # CONFIGURACOES
@@ -14,7 +14,12 @@ from flask import Flask, jsonify, render_template , request
 PORTA_SERIAL = "COM3"  # Altere para a porta do seu Arduino
 BAUD_RATE = 9600
 
-app = Flask(__name__)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TEMPLATE_DIR = os.path.abspath(
+    os.path.join(BASE_DIR, "..", "frontend", "templates")
+)
+
+app = Flask(__name__, template_folder=TEMPLATE_DIR)
 
 # ==========================================
 # ESTADO DO ESTACIONAMENTO
@@ -62,6 +67,8 @@ def registrar_evento(tipo, dados=None):
     with lock:
         eventos.append(evento)
 
+    # Ponto de extensao futuro: disparo de evento para Webhook Make -> Google Sheets
+
     print(f"[EVENTO] {tipo} - {dados or {}}")
 
 
@@ -86,7 +93,6 @@ def processar_mensagem(mensagem):
 
         registrar_evento("SYSTEM", {"estado": partes[1]})
 
-    
     # Estado da cancela
     elif tipo in ("GATE", "CANCELA") and len(partes) >= 2:
 
@@ -151,11 +157,6 @@ def processar_mensagem(mensagem):
 
     else:
         print(f"[AVISO] Mensagem desconhecida: {mensagem}")
-
-
-# ==========================================
-# CONEXAO SERIAL
-# ==========================================
 
 
 # ==========================================
@@ -267,9 +268,12 @@ def enviar_comando_arduino(comando):
 # ==========================================
 # API - STATUS COMPLETO
 # ==========================================
+
 @app.route("/")
 def dashboard():
     return render_template("index.html")
+
+
 @app.route("/api/status", methods=["GET"])
 def obter_status():
 
@@ -307,6 +311,7 @@ def obter_eventos():
         dados = list(eventos)
 
     return jsonify(dados)
+
 
 # ==========================================
 # SIMULADOR - COMANDOS PELO DASHBOARD
@@ -361,7 +366,7 @@ def simular_comando():
         "acao": acao
     })
 
-    
+
 # ==========================================
 # API - COMANDOS PARA O ARDUINO FISICO
 # ==========================================
@@ -400,6 +405,7 @@ def comandar_arduino():
         "acao": acao,
         "mensagem": mensagem
     })
+
 
 # ==========================================
 # API - VERIFICAR SERVIDOR
