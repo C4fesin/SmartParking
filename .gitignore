@@ -1,0 +1,27 @@
+# Cache e bytecode Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Variaveis de ambiente e credenciais locais (ex.: URLs privadas de webhook)
+.env
+.env.*
+
+# Arquivos temporarios de desenvolvimento e sistema operacional
+*.tmp
+*.temp
+*.bak
+*.swp
+*.log
+.DS_Store
+Thumbs.db
+
+# Configuracoes locais de IDEs
+.vscode/
+.idea/
