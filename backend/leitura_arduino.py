@@ -2,6 +2,10 @@ import os
 import serial
 import threading
 import time
+import json
+import queue
+import urllib.request
+import urllib.error
 
 from datetime import datetime
 from collections import deque
@@ -13,6 +17,13 @@ from flask import Flask, jsonify, render_template, request
 
 PORTA_SERIAL = "COM3"  # Altere para a porta do seu Arduino
 BAUD_RATE = 9600
+
+# ==========================================
+# INTEGRACAO COM MAKE
+# ==========================================
+
+MAKE_WEBHOOK_URL = os.getenv("MAKE_WEBHOOK_URL", "").strip()
+fila_eventos_make = queue.Queue(maxsize=200)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_DIR = os.path.abspath(
@@ -51,6 +62,82 @@ serial_lock = threading.Lock()
 serial_conectada = False
 
 # ==========================================
+# ENVIAR EVENTOS PARA O MAKE
+# ==========================================
+
+def enviar_evento_make(evento):
+
+    payload = {
+        "projeto": "SmartParking",
+        "horario": evento["horario"],
+        "tipo": evento["tipo"],
+        "detalhes": json.dumps(
+            evento.get("dados", {}),
+            ensure_ascii=False
+        )
+    }
+
+    corpo = json.dumps(
+        payload,
+        ensure_ascii=False
+    ).encode("utf-8")
+
+    requisicao = urllib.request.Request(
+        MAKE_WEBHOOK_URL,
+        data=corpo,
+        headers={
+            "Content-Type": "application/json; charset=utf-8",
+            "User-Agent": "SmartParking-Flask/1.0"
+        },
+        method="POST"
+    )
+
+    try:
+        with urllib.request.urlopen(
+            requisicao,
+            timeout=5
+        ) as resposta:
+
+            print(
+                f"[MAKE] Evento enviado: {evento['tipo']} "
+                f"(HTTP {resposta.status})"
+            )
+
+    except urllib.error.HTTPError as erro:
+
+        detalhe = erro.read().decode(
+            "utf-8",
+            errors="replace"
+        )
+
+        raise RuntimeError(
+            f"HTTP {erro.code}: {detalhe[:200]}"
+        ) from erro
+
+   
+
+
+def processar_fila_make():
+
+    while True:
+
+        evento = fila_eventos_make.get()
+
+        try:
+            enviar_evento_make(evento)
+
+        except Exception as erro:
+
+            print(
+                f"[MAKE] Falha no envio do evento "
+                f"{evento['tipo']}: {erro}"
+            )
+
+        finally:
+            fila_eventos_make.task_done()
+
+
+# ==========================================
 # REGISTRAR EVENTOS
 # ==========================================
 
@@ -67,7 +154,18 @@ def registrar_evento(tipo, dados=None):
     with lock:
         eventos.append(evento)
 
-    # Ponto de extensao futuro: disparo de evento para Webhook Make -> Google Sheets
+    # Envia evento ao Make sem bloquear o processamento principal
+    if MAKE_WEBHOOK_URL:
+
+        try:
+            fila_eventos_make.put_nowait(evento)
+
+        except queue.Full:
+
+            print(
+                "[MAKE] Fila cheia. "
+                "Evento mantido apenas no historico local."
+            )
 
     print(f"[EVENTO] {tipo} - {dados or {}}")
 
@@ -433,6 +531,24 @@ if __name__ == "__main__":
         target=conectar_arduino,
         daemon=True
     )
+
+    if MAKE_WEBHOOK_URL:
+
+        thread_make = threading.Thread(
+            target=processar_fila_make,
+            daemon=True
+        )
+
+        thread_make.start()
+
+        print("[MAKE] Integracao ativada.")
+
+    else:
+
+        print(
+            "[MAKE] Webhook nao configurado. "
+            "Integracao externa desativada."
+        )
 
     thread_serial.start()
 
