@@ -1,28 +1,61 @@
 # Arquitetura do Sistema — Smart Parking
 
-## 1. Camadas da Aplicação
+## 1. Visão Geral das Camadas
 
-1. **Camada Física (Firmware — `firmware/estacionamento_inteligente.ino`)**
-   * Executa no **Arduino Uno** em laço não bloqueante (`loop()`).
-   * Lê o sensor reflexivo infravermelho **TCRT5000** e os 3 botões táteis (com *debounce* de 50 ms).
-   * Aciona o micro servo **MG90S**, os LEDs de vaga, o semáforo da cancela e o buzzer.
-   * Comunica-se pela interface USB Serial a **9600 baud**.
+O sistema é estruturado em quatro camadas desacopladas:
 
-2. **Camada de Integração e API (Backend — `backend/leitura_arduino.py`)**
-   * Desenvolvida em **Python** com **Flask 3.1.3** e **PySerial 3.5**.
-   * Mantém uma *thread* dedicada (`conectar_arduino`) para leitura contínua da serial e reconexão automática a cada 5 segundos em caso de desconexão.
-   * Protege o dicionário compartilhado de estado e a fila de eventos (`deque(maxlen=100)`) com `threading.Lock`.
+1. **Camada Física (Hardware e Firmware):**
+   * Composta por **Arduino Uno**, sensor reflexivo infravermelho **TCRT5000**, micro servo motor **MG90S**, 3 botões táteis, LEDs indicadores e buzzer (`firmware/estacionamento_inteligente/estacionamento_inteligente.ino`).
+   * *Status:* Montagem inicial realizada em protoboard; integração serial bidirecional e estabilidade dos atuadores/sensores **pendentes de validação física**.
 
-3. **Camada de Visualização e Controle (Frontend — `frontend/templates/index.html`)**
-   * Interface web em HTML, CSS e JavaScript com atualização automática via `fetch` a cada 1000 ms.
-   * Permite monitorar ocupação e operar o modo simulador via requisições `POST` para `/api/simulate`.
+2. **Backend (API REST, Serial e Fila de Eventos):**
+   * Desenvolvido em **Python** com **Flask**, **PySerial**, `threading` e `queue` (`backend/leitura_arduino.py`).
+   * Gerencia o estado consolidado do estacionamento em memória, expõe endpoints REST para o frontend, mantém uma *thread* de reconexão serial e enfileira eventos para integração externa.
+
+3. **Frontend (Dashboard Web e Simulador):**
+   * Interface em **HTML, CSS e JavaScript** (`frontend/templates/index.html`) que consulta `/api/status` e `/api/events` a cada 1 segundo e permite acionar eventos sintéticos via `/api/simulate`.
+
+4. **Integração Externa (Make e Google Sheets):**
+   * Pipeline em nuvem (`Python/Flask → Webhook Make → Google Sheets`) alimentado por uma *thread* dedicada (`processar_fila_make`) que envia payloads JSON em UTF-8 via HTTP `POST`.
+   * *Status:* **Implementada e testada** com eventos gerados pelo simulador web.
 
 ---
 
-## 2. Arquitetura Prevista para Integração Externa (Etapa Futura)
+## 2. Fluxo Validado vs. Fluxo Pendente
 
-O sistema está estruturado para incorporar o registro externo de eventos sem alterar a lógica do microcontrolador:
+### Fluxo Validado (Operação via Simulador Web)
 
 ```text
-Arduino Uno (Serial) ──► Python / Flask (registrar_evento) ──► Webhook Make ──► Google Sheets
+[Dashboard Web / Simulador]
+        │  POST /api/simulate
+        ▼
+[Backend Python / Flask] ──► Atualiza estado e histórico local (deque)
+        │  put_nowait(evento)
+        ▼
+[Fila em Memória (Queue) + Thread Make]
+        │  HTTP POST (JSON / UTF-8)
+        ▼
+[Webhook Make] ──► [Planilha Google Sheets]
 
+Comportamento comprovado: Eventos de alteração de vaga (VAGA), estado da cancela (CANCELA) e detecção de veículo (VEÍCULO_DETECTADO) são processados pelo Flask, exibidos no dashboard e gravados automaticamente no Google Sheets via Make sem bloquear a interface.
+
+Limitação arquitetural: A fila de envio ao Make reside exclusivamente em memória RAM (maxsize=200). Caso ocorra falha de rede ou indisponibilidade temporária do endpoint, o evento não é persistido em disco nem reenviado automaticamente.
+
+Fluxo Pendente de Validação (Hardware Físico Conectado)
+[Sensores / Botões / Servo MG90S]
+        │
+        ▼
+[Arduino Uno (Firmware C++)]
+        │  USB Serial (9600 baud)
+        ▼
+[Thread Serial Python (PySerial)] ──► [Backend Flask] ──► [Dashboard + Make]
+
+Pendências técnicas:
+
+Validação elétrica e ajuste de sensibilidade do sensor TCRT5000 e alimentação do servo MG90S em bancada.
+
+Compilação e upload final do firmware na Arduino IDE.
+
+Teste end-to-end da comunicação bidirecional (CMD,OPEN, CMD,CLOSE, CMD,STATUS) com o Arduino conectado.
+
+Melhoria futura registrada: Revisar o procedimento de limpeza do buffer serial no backend (time.sleep(2) seguido de reset_input_buffer() após abertura da porta COM) para garantir sincronismo determinístico na reinicialização do Arduino Uno.
