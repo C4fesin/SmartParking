@@ -50,6 +50,10 @@ O projeto opera em dois fluxos principais:
 * Validação integral do circuito físico montado em protoboard.
 * Operação do sistema completo com hardware físico conectado ao backend.
 
+### Melhorias futuras planejadas
+
+* **Sincronização inicial na conexão serial:** Atualmente, o backend aguarda 2 segundos após abrir a porta serial e executa `reset_input_buffer()`, o que pode descartar mensagens enviadas pelo Arduino durante o *boot* (como `SYSTEM,STARTED` e os estados iniciais das vagas). Como melhoria futura para os testes físicos, será implementada a solicitação automática de `CMD,STATUS` logo após a conexão serial para sincronizar o estado inicial.
+
 ---
 
 ## Estrutura do Repositório
@@ -76,45 +80,105 @@ SmartParking/
 │       └── index.html
 ├── .gitignore
 └── README.md
+```
 
-Documentação e Evidências VisuaisArquitetura do SistemaEspecificações Técnicas e Protocolo SerialSimulação do Circuito no TinkercadFotografia do Circuito Físico em Protoboard.
-Instalação e Execução.
+---
 
-1. Clonar o repositório
-Bashgit clone [https://github.com/C4fesin/SmartParking.git](https://github.com/C4fesin/SmartParking.git)
+## Documentação e Evidências Visuais
+
+### Documentação Técnica
+
+* [Arquitetura do Sistema](docs/arquitetura/arquitetura.md)
+* [Especificações Técnicas e Protocolo Serial](docs/especificacoes-tecnicas/especificacoes.md)
+* [Código-fonte do Firmware Arduino](firmware/estacionamento_inteligente/estacionamento_inteligente.ino)
+
+### Evidências do Circuito
+
+| Simulação no Tinkercad | Protótipo Físico em Protoboard |
+| :---: | :---: |
+| ![Simulação do Circuito no Tinkercad](docs/simulacao-tinkercad/Tinercad-smart.png) | ![Circuito Físico em Protoboard](docs/circuito-fisico/circuito-fisico.jpeg) |
+| [Abrir imagem original](docs/simulacao-tinkercad/Tinercad-smart.png) | [Abrir imagem original](docs/circuito-fisico/circuito-fisico.jpeg) |
+
+---
+
+## Instalação e Execução
+
+### 1. Clonar o repositório
+
+```bash
+git clone [https://github.com/C4fesin/SmartParking.git](https://github.com/C4fesin/SmartParking.git)
 cd SmartParking
+```
 
-2. Criar e ativar o ambiente virtual PythonBashpython -m venv .venv
+### 2. Criar e ativar o ambiente virtual Python
 
-Windows (PowerShell):
-PowerShell: .venv\Scripts\Activate.ps1
+```bash
+python -m venv .venv
+```
 
-Linux / macOS:
-Bash: source .venv/bin/activate
+* **Windows (PowerShell):**
 
-3. Instalar as dependências
-Bash: pip install -r backend/requirements.txt
+```powershell
+.venv\Scripts\Activate.ps1
+```
 
-4. Executar o sistema (modo local, sem Make)
-Windows (PowerShell): py backend\leitura_arduino.py
+* **Linux / macOS:**
 
-Linux / macOS: python backend/leitura_arduino.py
+```bash
+source .venv/bin/activate
+```
 
-Após iniciar, abra no navegador: http://127.0.0.1:5000 
-Configuração da Integração com MakeA URL do webhook não é armazenada no código-fonte por segurança. 
-Para ativar o envio automático de eventos ao Make e ao Google Sheets, defina a variável de ambiente MAKE_WEBHOOK_URL na sessão do terminal antes de iniciar o servidor:
-Windows (PowerShell):
-PowerShell: $env:MAKE_WEBHOOK_URL = "SUA_URL_PRIVADA_DO_WEBHOOK"
+### 3. Instalar as dependências
+
+```bash
+pip install -r backend/requirements.txt
+```
+
+### 4. Executar o sistema (modo local, sem Make)
+
+* **Windows (PowerShell):**
+
+```powershell
 py backend\leitura_arduino.py
+```
 
-Linux / macOS:Bash: export MAKE_WEBHOOK_URL="SUA_URL_PRIVADA_DO_WEBHOOK"
+* **Linux / macOS:**
+
+```bash
 python backend/leitura_arduino.py
+```
 
-Endpoints da API 
-Rota       Método                 Descrição
-/,GET,Renderiza o dashboard web (frontend/templates/index.html)
-/api/status,GET,"Retorna o estado atual do sistema, cancela e contagem de vagas"
-/api/events,GET,Retorna os últimos 100 eventos registrados em memória
-/api/simulate,POST,"Simula eventos de vagas, cancela e chegada de veículo sem hardware"
-/api/command,POST,"Envia comandos seriais ao Arduino (CMD,OPEN, CMD,CLOSE, CMD,STATUS)"
-/health,GET,Informa se o servidor Flask está online e o status da conexão serial
+Após iniciar, abra no navegador: `http://127.0.0.1:5000`
+
+---
+
+## Configuração da Integração com Make
+
+A URL do webhook não é armazenada no código-fonte por segurança. Para ativar o envio automático de eventos ao Make e ao Google Sheets, defina a variável de ambiente `MAKE_WEBHOOK_URL` na sessão do terminal antes de iniciar o servidor:
+
+* **Windows (PowerShell):**
+
+```powershell
+$env:MAKE_WEBHOOK_URL = "SUA_URL_PRIVADA_DO_WEBHOOK"
+py backend\leitura_arduino.py
+```
+
+* **Linux / macOS:**
+
+```bash
+export MAKE_WEBHOOK_URL="SUA_URL_PRIVADA_DO_WEBHOOK"
+python backend/leitura_arduino.py
+```
+
+---
+
+## Endpoints da API REST
+
+| Rota | Método | Status | Descrição |
+| :--- | :---: | :---: | :--- |
+| `/` | `GET` | Testado | Renderiza o dashboard web (`frontend/templates/index.html`) |
+| `/api/status` | `GET` | Testado | Retorna o estado atual do sistema, cancela e contagem de vagas |
+| `/api/events` | `GET` | Testado | Retorna os últimos 100 eventos registrados em memória |
+| `/api/simulate` | `POST` | Testado | Altera o estado internamente no backend para testar o dashboard e o Make (não envia comandos ao Arduino) |
+| `/api/command` | `POST` | Pendente | Envia comandos seriais ao Arduino físico (`CMD,OPEN`, `CMD,CLOSE`, `CMD,STATUS`) — aguardando validação com hardware |
+| `/health` | `GET` | Testado | Informa se o servidor Flask está online e o status da conexão serial |

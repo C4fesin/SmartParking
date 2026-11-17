@@ -36,12 +36,14 @@ O sistema é estruturado em quatro camadas desacopladas:
         │  HTTP POST (JSON / UTF-8)
         ▼
 [Webhook Make] ──► [Planilha Google Sheets]
+```
 
-Comportamento comprovado: Eventos de alteração de vaga (VAGA), estado da cancela (CANCELA) e detecção de veículo (VEÍCULO_DETECTADO) são processados pelo Flask, exibidos no dashboard e gravados automaticamente no Google Sheets via Make sem bloquear a interface.
+* **Comportamento comprovado:** A rota `/api/simulate` altera o estado internamente no backend para testar o dashboard e o pipeline em nuvem (sem enviar dados pela porta serial). Eventos de alteração de vaga (`VAGA`), estado da cancela (`CANCELA`) e detecção de veículo (`VEÍCULO_DETECTADO`) são exibidos no dashboard e gravados automaticamente no Google Sheets via Make sem bloquear a interface.
+* **Limitação arquitetural:** A fila de envio ao Make reside exclusivamente em memória RAM (`maxsize=200`). Caso ocorra falha de rede ou indisponibilidade temporária do endpoint, o evento não é persistido em disco nem reenviado automaticamente.
 
-Limitação arquitetural: A fila de envio ao Make reside exclusivamente em memória RAM (maxsize=200). Caso ocorra falha de rede ou indisponibilidade temporária do endpoint, o evento não é persistido em disco nem reenviado automaticamente.
+### Fluxo Pendente de Validação (Hardware Físico Conectado)
 
-Fluxo Pendente de Validação (Hardware Físico Conectado)
+```text
 [Sensores / Botões / Servo MG90S]
         │
         ▼
@@ -49,13 +51,10 @@ Fluxo Pendente de Validação (Hardware Físico Conectado)
         │  USB Serial (9600 baud)
         ▼
 [Thread Serial Python (PySerial)] ──► [Backend Flask] ──► [Dashboard + Make]
+```
 
-Pendências técnicas:
-
-Validação elétrica e ajuste de sensibilidade do sensor TCRT5000 e alimentação do servo MG90S em bancada.
-
-Compilação e upload final do firmware na Arduino IDE.
-
-Teste end-to-end da comunicação bidirecional (CMD,OPEN, CMD,CLOSE, CMD,STATUS) com o Arduino conectado.
-
-Melhoria futura registrada: Revisar o procedimento de limpeza do buffer serial no backend (time.sleep(2) seguido de reset_input_buffer() após abertura da porta COM) para garantir sincronismo determinístico na reinicialização do Arduino Uno.
+* **Distinção de rotas:** Enquanto `/api/simulate` atua apenas em memória no backend, a rota `/api/command` foi preparada para transmitir comandos físicos (`CMD,OPEN`, `CMD,CLOSE`, `CMD,STATUS`) ao Arduino pela porta serial, permanecendo pendente de validação com o circuito conectado.
+* **Pendências técnicas e melhorias futuras:**
+  * Validação elétrica e ajuste de sensibilidade do sensor TCRT5000 e alimentação dedicada do servo MG90S em bancada.
+  * Compilação e upload final do firmware na Arduino IDE e teste *end-to-end* da comunicação bidirecional.
+  * **Sincronização inicial na abertura da porta serial:** Atualmente, o backend aguarda 2 segundos após abrir a porta COM e chama `reset_input_buffer()`, descartando mensagens enviadas pelo Arduino durante o reinício (como `SYSTEM,STARTED` e estados iniciais das vagas). Como melhoria futura, o backend deverá enviar automaticamente `CMD,STATUS` logo após conectar à serial para sincronizar o estado inicial com o dashboard.
